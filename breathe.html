@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Breathe — Rhythm Reset</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #13161d;
+    --ring-outer: rgba(180,210,255,0.06);
+    --ring-mid: rgba(180,210,255,0.11);
+    --ring-inner: rgba(180,210,255,0.18);
+    --glow: rgba(160,200,255,0.55);
+    --text-primary: #e8eef8;
+    --text-soft: #7a8ba6;
+    --text-muted: #3d4d61;
+    --accent: #a0c8ff;
+    --accent-warm: #ffd8a0;
+    --accent-nose: #b0e8c8;
+    --accent-mouth: #a0c8ff;
+    --dot-active: #a0c8ff;
+    --dot-done: #3d5268;
+    --dot-pending: #1e2836;
+    --transition-fast: 0.3s cubic-bezier(0.4,0,0.2,1);
+    --transition-breath: 3s cubic-bezier(0.45,0,0.55,1);
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: 'DM Mono', monospace;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  /* ── NOISE OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.5; pointer-events: none; z-index: 999;
+  }
+
+  /* ── SCREENS ── */
+  .screen {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  .screen.hidden { opacity: 0; pointer-events: none; transform: scale(0.97); }
+
+  /* ══════════════════════════
+     WELCOME SCREEN
+  ══════════════════════════ */
+  #welcome {
+    gap: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 40%, rgba(60,100,160,0.12) 0%, transparent 70%);
+  }
+
+  .welcome-top {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 12px; margin-bottom: 60px;
+  }
+
+  .app-icon {
+    font-size: 52px;
+    animation: float 4s ease-in-out infinite;
+    filter: drop-shadow(0 0 20px rgba(160,200,255,0.4));
+  }
+
+  @keyframes float {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .app-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 42px;
+    font-weight: 300;
+    letter-spacing: 0.08em;
+    color: var(--text-primary);
+  }
+
+  .app-tagline {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+    font-weight: 300;
+  }
+
+  .pattern-preview {
+    display: flex; flex-direction: column; gap: 8px;
+    margin-bottom: 56px; width: 260px;
+  }
+
+  .pattern-preview-title {
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  .pattern-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 10px 14px;
+    gap: 8px;
+  }
+
+  .pattern-step-num {
+    font-size: 10px;
+    color: var(--text-muted);
+    width: 16px;
+  }
+
+  .pattern-inhale, .pattern-exhale {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px;
+    flex: 1;
+  }
+
+  .pattern-inhale { justify-content: flex-start; color: var(--text-soft); }
+  .pattern-exhale { justify-content: flex-end; color: var(--text-soft); }
+
+  .pattern-divider {
+    font-size: 10px; color: var(--text-muted);
+  }
+
+  .pattern-nose { color: var(--text-soft) !important; }
+  .pattern-mouth { color: var(--text-soft) !important; }
+
+  .info-row {
+    display: flex; gap: 24px; margin-bottom: 52px;
+  }
+
+  .info-pill {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 12px 20px;
+  }
+
+  .info-pill-val {
+    font-size: 20px;
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 400;
+    color: var(--accent);
+  }
+
+  .info-pill-label {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .start-btn {
+    width: 200px; height: 56px;
+    border: 1px solid rgba(160,200,255,0.3);
+    border-radius: 28px;
+    background: rgba(160,200,255,0.08);
+    color: var(--accent);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    position: relative; overflow: hidden;
+  }
+
+  .start-btn::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(160,200,255,0.2), transparent 70%);
+    opacity: 0; transition: opacity 0.3s;
+  }
+
+  .start-btn:hover::before, .start-btn:active::before { opacity: 1; }
+  .start-btn:active { transform: scale(0.97); }
+
+  /* ══════════════════════════
+     EXERCISE SCREEN
+  ══════════════════════════ */
+  #exercise {
+    gap: 0;
+    padding: 0 24px;
+  }
+
+  /* TOP BAR */
+  .top-bar {
+    position: fixed; top: 0; left: 0; right: 0;
+    padding: 20px 24px 0;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+
+  .exit-btn {
+    background: none; border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px; color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.2em;
+    padding: 6px 14px; cursor: pointer;
+    transition: var(--transition-fast);
+  }
+  .exit-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text-soft); }
+
+  .session-timer {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.15em;
+  }
+
+  /* ROUND DOTS */
+  .round-dots {
+    display: flex; gap: 7px; margin-bottom: 44px;
+    margin-top: 80px;
+  }
+
+  .round-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--dot-pending);
+    transition: background 0.4s ease, transform 0.4s ease, box-shadow 0.4s ease;
+  }
+  .round-dot.done { background: var(--dot-done); }
+  .round-dot.active {
+    background: var(--dot-active);
+    transform: scale(1.3);
+    box-shadow: 0 0 8px var(--glow);
+  }
+
+  /* CENTER RING */
+  .ring-container {
+    position: relative;
+    width: 240px; height: 240px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 44px;
+  }
+
+  .ring {
+    position: absolute; border-radius: 50%;
+    border: 1px solid transparent;
+    transition: transform var(--transition-breath), opacity var(--transition-breath);
+  }
+
+  .ring-3 {
+    width: 240px; height: 240px;
+    border-color: var(--ring-outer);
+    background: transparent;
+  }
+
+  .ring-2 {
+    width: 190px; height: 190px;
+    border-color: var(--ring-mid);
+    background: rgba(160,200,255,0.02);
+  }
+
+  .ring-1 {
+    width: 140px; height: 140px;
+    border-color: var(--ring-inner);
+    background: rgba(160,200,255,0.04);
+  }
+
+  .ring-core {
+    width: 90px; height: 90px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(160,200,255,0.15) 0%, rgba(160,200,255,0.05) 60%, transparent 100%);
+    border: 1px solid rgba(160,200,255,0.25);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform var(--transition-breath), box-shadow var(--transition-breath), background var(--transition-breath), border-color var(--transition-breath);
+    position: relative; z-index: 2;
+  }
+
+  .ring-core-emoji {
+    font-size: 26px;
+    transition: transform 0.3s ease, filter 0.3s ease;
+  }
+
+  /* INHALE STATE */
+  .breathing-inhale .ring-3 { transform: scale(1.06); }
+  .breathing-inhale .ring-2 { transform: scale(1.08); }
+  .breathing-inhale .ring-1 { transform: scale(1.12); }
+  .breathing-inhale .ring-core {
+    transform: scale(1.18);
+    box-shadow: 0 0 30px rgba(160,200,255,0.3), 0 0 60px rgba(160,200,255,0.12);
+    background: radial-gradient(circle, rgba(160,200,255,0.25) 0%, rgba(160,200,255,0.08) 60%, transparent 100%);
+    border-color: rgba(160,200,255,0.5);
+  }
+
+  /* EXHALE STATE */
+  .breathing-exhale .ring-3 { transform: scale(0.97); }
+  .breathing-exhale .ring-2 { transform: scale(0.95); }
+  .breathing-exhale .ring-1 { transform: scale(0.92); }
+  .breathing-exhale .ring-core {
+    transform: scale(0.88);
+    box-shadow: 0 0 12px rgba(160,200,255,0.1);
+    background: radial-gradient(circle, rgba(160,200,255,0.08) 0%, rgba(160,200,255,0.02) 60%, transparent 100%);
+    border-color: rgba(160,200,255,0.15);
+  }
+
+  /* PHASE LABEL */
+  .phase-block {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    min-height: 90px; justify-content: flex-start;
+    margin-bottom: 28px;
+  }
+
+  .phase-action {
+    font-size: 18px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    transition: color 0.4s ease, transform 3s cubic-bezier(0.45,0,0.55,1);
+    transform-origin: center;
+  }
+
+  .phase-source {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 38px;
+    font-weight: 300;
+    font-style: italic;
+    transition: color 0.4s ease, transform 3s cubic-bezier(0.45,0,0.55,1);
+    transform-origin: center;
+  }
+
+  /* Text breathes with the ring */
+  .breathing-inhale .phase-action { transform: scale(1.12); }
+  .breathing-inhale .phase-source { transform: scale(1.07); }
+  .breathing-exhale .phase-action { transform: scale(0.91); }
+  .breathing-exhale .phase-source { transform: scale(0.94); }
+
+  .phase-timer-bar {
+    width: 120px; height: 2px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 2px;
+    overflow: hidden; margin-top: 4px;
+  }
+
+  .phase-timer-fill {
+    height: 100%; width: 0%;
+    border-radius: 2px;
+    background: var(--accent);
+    transition: background 0.4s ease;
+  }
+
+  /* STEP INDICATOR */
+  .step-indicator {
+    display: flex; gap: 10px; margin-bottom: 36px;
+  }
+
+  .step-pip {
+    width: 28px; height: 4px; border-radius: 2px;
+    transition: background 0.4s ease, transform 0.3s ease;
+  }
+
+  .step-pip:nth-child(1) { background: var(--dot-pending); } /* placeholder, JS controls */
+
+  /* BOTTOM INFO */
+  .bottom-row {
+    display: flex; align-items: center; justify-content: center; gap: 28px;
+  }
+
+  .info-chip {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10px; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--text-muted);
+  }
+
+  .info-chip-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--text-muted);
+    animation: pulse-dot 2s ease infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%,100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  /* ══════════════════════════
+     COMPLETE SCREEN
+  ══════════════════════════ */
+  #complete {
+    gap: 0;
+    background: radial-gradient(ellipse 70% 50% at 50% 45%, rgba(60,160,100,0.08) 0%, transparent 70%);
+  }
+
+  .complete-icon {
+    font-size: 56px;
+    margin-bottom: 20px;
+    animation: pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+  }
+
+  @keyframes pop {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .complete-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 38px; font-weight: 300;
+    margin-bottom: 8px;
+  }
+
+  .complete-sub {
+    font-size: 11px; color: var(--text-soft);
+    letter-spacing: 0.2em; text-transform: uppercase;
+    margin-bottom: 48px;
+  }
+
+  .stats-row {
+    display: flex; gap: 16px; margin-bottom: 52px;
+  }
+
+  .stat-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 16px 24px;
+    text-align: center;
+  }
+
+  .stat-val {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 30px; font-weight: 400;
+    color: var(--accent-nose);
+  }
+
+  .stat-label {
+    font-size: 9px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .again-btn {
+    width: 180px; height: 50px;
+    border: 1px solid rgba(160,200,255,0.25);
+    border-radius: 25px;
+    background: rgba(160,200,255,0.06);
+    color: var(--accent);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 0.25em;
+    text-transform: uppercase; cursor: pointer;
+    transition: var(--transition-fast);
+  }
+  .again-btn:hover { background: rgba(160,200,255,0.12); }
+  .again-btn:active { transform: scale(0.97); }
+
+  /* ── NOTIFICATION BADGE ── */
+  #notify-banner {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    background: rgba(20,25,35,0.92);
+    border: 1px solid rgba(160,200,255,0.2);
+    border-radius: 20px; padding: 10px 20px;
+    font-size: 11px; letter-spacing: 0.1em; color: var(--accent);
+    z-index: 1000; opacity: 0;
+    transition: opacity 0.4s ease;
+    backdrop-filter: blur(10px);
+    white-space: nowrap;
+  }
+  #notify-banner.show { opacity: 1; }
+
+  /* ── WAKELOCK INDICATOR ── */
+  #wakelock-icon {
+    position: fixed; bottom: 20px; right: 20px;
+    font-size: 12px; opacity: 0.3; display: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- NOTIFICATION BANNER -->
+<div id="notify-banner">🫁 Time for a breath break</div>
+<div id="wakelock-icon">🔒</div>
+
+<!-- ════ WELCOME SCREEN ════ -->
+<div class="screen" id="welcome">
+  <div class="welcome-top">
+    <div class="app-icon">🌬️</div>
+    <div class="app-name">Breathe</div>
+    <div class="app-tagline">Rhythm Reset · 4-Pattern Cycle</div>
+  </div>
+
+  <div class="pattern-preview">
+    <div class="pattern-preview-title">The Pattern</div>
+
+    <div class="pattern-row">
+      <span class="pattern-step-num">1</span>
+      <div class="pattern-inhale">👄 <span>Mouth in</span></div>
+      <span class="pattern-divider">→</span>
+      <div class="pattern-exhale"><span>Mouth out</span> 👄</div>
+    </div>
+
+    <div class="pattern-row">
+      <span class="pattern-step-num">2</span>
+      <div class="pattern-inhale">👄 <span>Mouth in</span></div>
+      <span class="pattern-divider">→</span>
+      <div class="pattern-exhale pattern-nose"><span>Nose out</span> 👃</div>
+    </div>
+
+    <div class="pattern-row">
+      <span class="pattern-step-num">3</span>
+      <div class="pattern-inhale pattern-nose">👃 <span>Nose in</span></div>
+      <span class="pattern-divider">→</span>
+      <div class="pattern-exhale pattern-nose"><span>Nose out</span> 👃</div>
+    </div>
+
+    <div class="pattern-row">
+      <span class="pattern-step-num">4</span>
+      <div class="pattern-inhale pattern-nose">👃 <span>Nose in</span></div>
+      <span class="pattern-divider">→</span>
+      <div class="pattern-exhale"><span>Mouth out</span> 👄</div>
+    </div>
+  </div>
+
+  <div class="info-row">
+    <div class="info-pill">
+      <div class="info-pill-val">9×</div>
+      <div class="info-pill-label">Rounds</div>
+    </div>
+    <div class="info-pill">
+      <div class="info-pill-val">3s</div>
+      <div class="info-pill-label">Per Phase</div>
+    </div>
+    <div class="info-pill">
+      <div class="info-pill-val">~4m</div>
+      <div class="info-pill-label">Total</div>
+    </div>
+  </div>
+
+  <button class="start-btn" id="startBtn">Begin Session</button>
+</div>
+
+<!-- ════ EXERCISE SCREEN ════ -->
+<div class="screen hidden" id="exercise">
+  <div class="top-bar">
+    <button class="exit-btn" id="exitBtn">✕ Exit</button>
+    <div class="session-timer" id="sessionTimer">0:00</div>
+  </div>
+
+  <div class="round-dots" id="roundDots"></div>
+
+  <div class="ring-container" id="ringContainer">
+    <div class="ring ring-3"></div>
+    <div class="ring ring-2"></div>
+    <div class="ring ring-1"></div>
+    <div class="ring-core" id="ringCore">
+      <span class="ring-core-emoji" id="coreEmoji">🌬️</span>
+    </div>
+  </div>
+
+  <div class="phase-block">
+    <div class="phase-action" id="phaseAction">—</div>
+    <div class="phase-source" id="phaseSource">—</div>
+    <div class="phase-timer-bar">
+      <div class="phase-timer-fill" id="timerFill"></div>
+    </div>
+  </div>
+
+  <div class="step-indicator" id="stepPips"></div>
+
+  <div class="bottom-row">
+    <div class="info-chip">
+      <div class="info-chip-dot"></div>
+      <span id="roundLabel">Round 1 of 9</span>
+    </div>
+  </div>
+</div>
+
+<!-- ════ COMPLETE SCREEN ════ -->
+<div class="screen hidden" id="complete">
+  <div class="complete-icon">✨</div>
+  <div class="complete-title">Well done</div>
+  <div class="complete-sub">Session complete</div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-val">36</div>
+      <div class="stat-label">Breaths</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="totalTimeDisplay">—</div>
+      <div class="stat-label">Minutes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">4</div>
+      <div class="stat-label">Patterns</div>
+    </div>
+  </div>
+
+  <button class="again-btn" id="againBtn">Begin Again</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  BREATHE APP — Core Logic
+// ═══════════════════════════════════════════════
+
+const PHASE_DURATION = 3000; // 3 seconds per inhale/exhale
+const TOTAL_ROUNDS = 9;
+
+// The 4-step pattern per round: [inhale source, exhale source]
+const PATTERN = [
+  { inhale: 'mouth', exhale: 'mouth' },
+  { inhale: 'mouth', exhale: 'nose'  },
+  { inhale: 'nose',  exhale: 'nose'  },
+  { inhale: 'nose',  exhale: 'mouth' },
+];
+
+const LABELS = { mouth: 'Mouth', nose: 'Nose' };
+const EMOJIS = { mouth: '👄', nose: '👃' };
+const COLORS = { mouth: 'var(--accent-mouth)', nose: 'var(--accent-nose)' };
+
+// ── State
+let currentRound = 0;
+let currentStep = 0;   // 0-3 within pattern
+let currentPhase = 'inhale'; // 'inhale' | 'exhale'
+let sessionStartTime = null;
+let phaseInterval = null;
+let phaseProgress = 0;
+let progressInterval = null;
+let sessionTimerInterval = null;
+let wakeLock = null;
+let isRunning = false;
+
+// ── DOM
+const welcomeScreen = document.getElementById('welcome');
+const exerciseScreen = document.getElementById('exercise');
+const completeScreen = document.getElementById('complete');
+const startBtn      = document.getElementById('startBtn');
+const exitBtn       = document.getElementById('exitBtn');
+const againBtn      = document.getElementById('againBtn');
+const ringContainer = document.getElementById('ringContainer');
+const ringCore      = document.getElementById('ringCore');
+const coreEmoji     = document.getElementById('coreEmoji');
+const phaseAction   = document.getElementById('phaseAction');
+const phaseSource   = document.getElementById('phaseSource');
+const timerFill     = document.getElementById('timerFill');
+const roundDots     = document.getElementById('roundDots');
+const stepPips      = document.getElementById('stepPips');
+const roundLabel    = document.getElementById('roundLabel');
+const sessionTimer  = document.getElementById('sessionTimer');
+const notifyBanner  = document.getElementById('notify-banner');
+const totalTimeDisplay = document.getElementById('totalTimeDisplay');
+const wakelockIcon  = document.getElementById('wakelock-icon');
+
+// ── Build round dots
+for (let i = 0; i < TOTAL_ROUNDS; i++) {
+  const dot = document.createElement('div');
+  dot.className = 'round-dot';
+  dot.id = `dot-${i}`;
+  roundDots.appendChild(dot);
+}
+
+// ── Build step pips
+for (let i = 0; i < 4; i++) {
+  const pip = document.createElement('div');
+  pip.className = 'step-pip';
+  pip.id = `pip-${i}`;
+  stepPips.appendChild(pip);
+}
+
+// ─────────────────────────────────────
+//  AUDIO ENGINE — Web Audio API
+// ─────────────────────────────────────
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playTone(freq, type = 'sine', duration = 0.3, vol = 0.12, fadeOut = true) {
+  const ctx = getAudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol, ctx.currentTime);
+  if (fadeOut) gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + duration + 0.05);
+}
+
+function playInhaleTone(source) {
+  // Soft rising chime for inhale
+  const freq = source === 'mouth' ? 440 : 528;
+  playTone(freq, 'sine', 0.5, 0.1);
+  setTimeout(() => playTone(freq * 1.25, 'sine', 0.4, 0.06), 150);
+}
+
+function playExhaleTone(source) {
+  // Softer descending for exhale
+  const freq = source === 'mouth' ? 330 : 396;
+  playTone(freq, 'sine', 0.6, 0.08);
+  setTimeout(() => playTone(freq * 0.8, 'sine', 0.5, 0.05), 200);
+}
+
+function playCompleteSound() {
+  [523, 659, 784, 1047].forEach((f, i) => {
+    setTimeout(() => playTone(f, 'sine', 0.8, 0.1), i * 180);
+  });
+}
+
+// ─────────────────────────────────────
+//  WAKE LOCK
+// ─────────────────────────────────────
+async function requestWakeLock() {
+  if ('wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakelockIcon.style.display = 'block';
+    } catch {}
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+  wakelockIcon.style.display = 'none';
+}
+
+// ─────────────────────────────────────
+//  SCREEN TRANSITIONS
+// ─────────────────────────────────────
+function showScreen(id) {
+  [welcomeScreen, exerciseScreen, completeScreen].forEach(s => {
+    s.classList.add('hidden');
+  });
+  document.getElementById(id).classList.remove('hidden');
+}
+
+// ─────────────────────────────────────
+//  SESSION TIMER
+// ─────────────────────────────────────
+function startSessionTimer() {
+  sessionStartTime = Date.now();
+  sessionTimerInterval = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+    const m = Math.floor(elapsed / 60);
+    const s = elapsed % 60;
+    sessionTimer.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+  }, 500);
+}
+
+function stopSessionTimer() {
+  clearInterval(sessionTimerInterval);
+  if (sessionStartTime) {
+    const elapsed = ((Date.now() - sessionStartTime) / 1000 / 60).toFixed(1);
+    totalTimeDisplay.textContent = elapsed;
+  }
+}
+
+// ─────────────────────────────────────
+//  PHASE PROGRESS BAR
+// ─────────────────────────────────────
+function startProgressBar() {
+  clearInterval(progressInterval);
+  phaseProgress = 0;
+  timerFill.style.transition = 'none';
+  timerFill.style.width = '0%';
+  requestAnimationFrame(() => {
+    timerFill.style.transition = `width ${PHASE_DURATION}ms linear`;
+    timerFill.style.width = '100%';
+  });
+}
+
+// ─────────────────────────────────────
+//  UPDATE UI FOR CURRENT PHASE
+// ─────────────────────────────────────
+function updatePhaseUI() {
+  const step = PATTERN[currentStep];
+  const source = currentPhase === 'inhale' ? step.inhale : step.exhale;
+  const color = COLORS[source];
+
+  // Text labels
+  phaseAction.textContent = currentPhase === 'inhale' ? 'INHALE' : 'EXHALE';
+  phaseAction.style.color = color;
+  phaseSource.textContent = `via ${LABELS[source]}`;
+  phaseSource.style.color = color;
+
+  // Core emoji
+  coreEmoji.textContent = EMOJIS[source];
+
+  // Ring animation class
+  ringContainer.classList.remove('breathing-inhale', 'breathing-exhale');
+  void ringContainer.offsetWidth;
+  ringContainer.classList.add(currentPhase === 'inhale' ? 'breathing-inhale' : 'breathing-exhale');
+
+  // Ring core color tint based on source
+  ringCore.style.borderColor = source === 'nose'
+    ? 'rgba(176,232,200,0.4)'
+    : 'rgba(160,200,255,0.4)';
+
+  // Timer fill color
+  timerFill.style.background = color;
+
+  // Step pips
+  for (let i = 0; i < 4; i++) {
+    const pip = document.getElementById(`pip-${i}`);
+    if (i < currentStep) {
+      pip.style.background = 'var(--dot-done)';
+      pip.style.transform = 'scaleY(1)';
+    } else if (i === currentStep) {
+      pip.style.background = color;
+      pip.style.transform = 'scaleY(1.5)';
+    } else {
+      pip.style.background = 'var(--dot-pending)';
+      pip.style.transform = 'scaleY(1)';
+    }
+  }
+
+  // Round dots
+  for (let i = 0; i < TOTAL_ROUNDS; i++) {
+    const dot = document.getElementById(`dot-${i}`);
+    dot.classList.remove('active', 'done');
+    if (i < currentRound) dot.classList.add('done');
+    else if (i === currentRound) dot.classList.add('active');
+  }
+
+  roundLabel.textContent = `Round ${currentRound + 1} of ${TOTAL_ROUNDS}`;
+
+  // Progress bar
+  startProgressBar();
+
+  // Sound
+  if (currentPhase === 'inhale') playInhaleTone(source);
+  else playExhaleTone(source);
+}
+
+// ─────────────────────────────────────
+//  ADVANCE TO NEXT PHASE
+// ─────────────────────────────────────
+function nextPhase() {
+  if (!isRunning) return;
+
+  if (currentPhase === 'inhale') {
+    currentPhase = 'exhale';
+  } else {
+    currentPhase = 'inhale';
+    currentStep++;
+
+    if (currentStep >= PATTERN.length) {
+      currentStep = 0;
+      currentRound++;
+
+      if (currentRound >= TOTAL_ROUNDS) {
+        endSession();
+        return;
+      }
+    }
+  }
+
+  updatePhaseUI();
+  phaseInterval = setTimeout(nextPhase, PHASE_DURATION);
+}
+
+// ─────────────────────────────────────
+//  START SESSION
+// ─────────────────────────────────────
+function startSession() {
+  isRunning = true;
+  currentRound = 0;
+  currentStep = 0;
+  currentPhase = 'inhale';
+
+  showScreen('exercise');
+  requestWakeLock();
+  startSessionTimer();
+
+  // Small delay before first phase for smooth transition
+  setTimeout(() => {
+    updatePhaseUI();
+    phaseInterval = setTimeout(nextPhase, PHASE_DURATION);
+  }, 600);
+}
+
+// ─────────────────────────────────────
+//  END SESSION
+// ─────────────────────────────────────
+function endSession() {
+  isRunning = false;
+  clearTimeout(phaseInterval);
+  stopSessionTimer();
+  releaseWakeLock();
+  playCompleteSound();
+
+  // Reset ring
+  ringContainer.classList.remove('breathing-inhale', 'breathing-exhale');
+
+  setTimeout(() => showScreen('complete'), 400);
+}
+
+// ─────────────────────────────────────
+//  EXIT MID-SESSION
+// ─────────────────────────────────────
+function exitSession() {
+  isRunning = false;
+  clearTimeout(phaseInterval);
+  stopSessionTimer();
+  releaseWakeLock();
+  ringContainer.classList.remove('breathing-inhale', 'breathing-exhale');
+  showScreen('welcome');
+}
+
+// ─────────────────────────────────────
+//  NOTIFICATIONS (4-hour reminders)
+// ─────────────────────────────────────
+function setupNotifications() {
+  if ('Notification' in window) {
+    Notification.requestPermission().then(perm => {
+      if (perm === 'granted') scheduleReminder();
+    });
+  }
+  // Also schedule in-app banner as fallback
+  scheduleInAppReminder();
+}
+
+function scheduleReminder() {
+  const INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
+  setInterval(() => {
+    if (document.hidden || !isRunning) {
+      new Notification('🫁 Breathe', {
+        body: 'Time for your 4-minute breath break. Reset your rhythm.',
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🌬️</text></svg>',
+        tag: 'breathe-reminder'
+      });
+    }
+  }, INTERVAL_MS);
+}
+
+function scheduleInAppReminder() {
+  const INTERVAL_MS = 4 * 60 * 60 * 1000;
+  setInterval(() => {
+    if (!isRunning) showBanner();
+  }, INTERVAL_MS);
+}
+
+function showBanner() {
+  notifyBanner.classList.add('show');
+  setTimeout(() => notifyBanner.classList.remove('show'), 5000);
+}
+
+// ─────────────────────────────────────
+//  DEMO: show banner after 10s for testing
+//  (remove or change timing in production)
+// ─────────────────────────────────────
+// Uncomment to test the banner:
+// setTimeout(showBanner, 10000);
+
+// ─────────────────────────────────────
+//  EVENT LISTENERS
+// ─────────────────────────────────────
+startBtn.addEventListener('click', () => {
+  getAudioCtx(); // Unlock audio on user gesture
+  setupNotifications();
+  startSession();
+});
+
+exitBtn.addEventListener('click', () => {
+  if (confirm('End this session early?')) exitSession();
+});
+
+againBtn.addEventListener('click', () => {
+  showScreen('welcome');
+});
+
+// Restore wake lock if visibility changes
+document.addEventListener('visibilitychange', async () => {
+  if (wakeLock !== null && document.visibilityState === 'visible' && isRunning) {
+    await requestWakeLock();
+  }
+});
+</script>
+</body>
+</html>
